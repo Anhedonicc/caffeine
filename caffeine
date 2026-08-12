@@ -1,0 +1,122 @@
+#!/usr/bin/env python3
+"""caffeine — keep your computer awake while this terminal is open."""
+
+import ctypes
+import os
+import platform
+import signal
+import subprocess
+import sys
+import time
+
+
+def fmt(seconds: int) -> str:
+    h, rem = divmod(seconds, 3600)
+    m, s = divmod(rem, 60)
+    return f"{h}h {m}m {s}s"
+
+
+def start_macos():
+    # -d display, -i idle, -s system (only when on AC), -u user active
+    return subprocess.Popen(
+        ["caffeinate", "-dimsu"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+
+def start_linux():
+    # Prefer systemd-inhibit (present on most modern distros).
+    if _which("systemd-inhibit"):
+        return subprocess.Popen(
+            [
+                "systemd-inhibit",
+                "--what=idle:sleep:handle-lid-switch",
+                "--who=caffeine",
+                "--why=User requested",
+                "--mode=block",
+                "sleep", "infinity",
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    # Fallbacks
+    if _which("xdg-screensaver"):
+        # xdg-screensaver has a suspend subcommand that needs a window id;
+        # fall through to the pure-python heartbeat if we get here.
+        pass
+    return None
+
+
+ES_CONTINUOUS       = 0x80000000
+ES_SYSTEM_REQUIRED  = 0x00000001
+ES_DISPLAY_REQUIRED = 0x00000002
+
+
+def set_windows_awake(on: bool) -> None:
+    flags = ES_CONTINUOUS
+    if on:
+        flags |= ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED
+    ctypes.windll.kernel32.SetThreadExecutionState(ctypes.c_uint(flags))
+
+
+def _which(cmd: str) -> bool:
+    from shutil import which
+    return which(cmd) is not None
+
+
+def main() -> int:
+    system = platform.system()
+    child = None
+
+    if system == "Darwin":
+        child = start_macos()
+    elif system == "Linux":
+        child = start_linux()
+        if child is None:
+            print("caffeine: no supported inhibitor found (systemd-inhibit).",
+                  file=sys.stderr)
+            print("Falling back to activity heartbeat only — sleep may still trigger.",
+                  file=sys.stderr)
+    elif system == "Windows":
+        set_windows_awake(True)
+    else:
+        print(f"caffeine: unsupported platform: {system}", file=sys.stderr)
+        return 2
+
+    stopped = {"flag": False}
+
+    def stop(signum, frame):
+        stopped["flag"] = True
+
+    signal.signal(signal.SIGINT, stop)
+    signal.signal(signal.SIGTERM, stop)
+
+    started = time.monotonic()
+    try:
+        while not stopped["flag"]:
+            elapsed = int(time.monotonic() - started)
+            line = f"\rcaffeine  {fmt(elapsed)}  [Ctrl+C] to stop.   "
+            sys.stdout.write(line)
+            sys.stdout.flush()
+            time.sleep(1)
+    finally:
+        sys.stdout.write("\n")
+        sys.stdout.flush()
+        if child is not None:
+            try:
+                child.terminate()
+                child.wait(timeout=3)
+            except Exception:
+                try:
+                    child.kill()
+                except Exception:
+                    pass
+        if system == "Windows":
+            set_windows_awake(False)
+
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
