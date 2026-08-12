@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="assets/banner.svg" alt="caffeine" width="720">
+
 # caffeine
 
 **Keep your computer awake, for as long as the terminal stays open.**
