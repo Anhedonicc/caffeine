@@ -1,10 +1,8 @@
 <div align="center">
 
-<img src="assets/banner.svg" alt="caffeine" width="720">
-
 # caffeine
 
-**Keep your computer awake — for as long as the terminal stays open.**
+**Keep your computer awake, for as long as the terminal stays open.**
 
 [![Platform: macOS](https://img.shields.io/badge/macOS-supported-000?logo=apple&logoColor=white)](#macos)
 [![Platform: Windows](https://img.shields.io/badge/Windows-supported-0078D6?logo=windows&logoColor=white)](#windows)
@@ -57,7 +55,7 @@ When you press **Ctrl + C** (or close the terminal), the inhibitor child process
 Clone the repo once, then follow the section for your OS. Nothing needs to be built.
 
 ```bash
-git clone https://github.com/<you>/caffeine.git
+git clone https://github.com/Anhedonicc/caffeine.git
 cd caffeine
 ```
 
